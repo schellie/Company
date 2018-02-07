@@ -1,0 +1,5 @@
+/vendor/
+/logs/
+composer.json
+composer.lock
+/public/js/jqueryui/jquery-ui-1.12.1.custom.zip
