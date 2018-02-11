@@ -14,9 +14,14 @@ function element(type, content, attribs = {}) {
 }
 
 class Field {
-    constructor(label, value, attr, readonly = false) {
+    // object, member, label, default, attributes
+    constructor(obj, member, label, defvalue, attr, readonly = false) {
+        if (typeof obj !== 'undefined') {
+            this._val = obj[member];
+        } else {
+            this._val = defvalue;
+        }
         this._label = label;
-        this._val = (value === undefined) ? '' : value;
         this._attr = attr || {};
         this._ro = readonly;
         this._ident = 'label' + label.replace(/\W/g, ''); // get only word chars (a-Z,0-9,_);
