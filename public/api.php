@@ -1,156 +1,125 @@
 <?php
 
-// further: https://www.simplifiedcoding.net/php-restful-api-framework-slim-tutorial-1/
-// CanJS (?)
-
 use \Psr\Http\Message\ServerRequestInterface as Request;
 use \Psr\Http\Message\ResponseInterface as Response;
 
-require '../vendor/autoload.php';
+require "../vendor/autoload.php";
 
 function debug_to_console($data) {
     $output = $data;
     if (is_array($output)) {
-        $output = implode(',', $output);
+        $output = implode(",", $output);
     }
-
-    echo "<script>console.log( 'Debug Objects: " . $output . "' );</script>";
+    echo "<script>console.log( \"Debug Objects: \" . $output . \"\" );</script>";
 }
 
 // important in develop-mode
-$config['displayErrorDetails'] = true;
-$config['addContentLengthHeader'] = false;
-$config['outputBuffering'] = false;
+$config["displayErrorDetails"] = true;
+$config["addContentLengthHeader"] = false;
+$config["outputBuffering"] = false;
 
-$config['db']['host'] = "localhost";
-$config['db']['user'] = "root";
-$config['db']['pass'] = "";
-$config['db']['dbname'] = "company";
+$config["db"]["host"] = "localhost";
+$config["db"]["user"] = "root";
+$config["db"]["pass"] = "";
+$config["db"]["dbname"] = "company";
+$config["logger"]["name"] = "cy_log";
+$config["logger"]["file"] = "../logs/company.log";
 
 $app = new \Slim\App(["settings" => $config]);
 $container = $app->getContainer();
 
-$container['db'] = function ($c) {
-    $db = $c['settings']['db'];
-    $pdo = new PDO("mysql:host=" . $db['host'] . ";dbname=" . $db['dbname'] . ";charset=utf8", $db['user'], $db['pass']);
+$container["db"] = function ($c) {
+    $db = $c["settings"]["db"];
+    $pdo = new PDO("mysql:host=" . $db["host"] . ";dbname=" . $db["dbname"] . ";charset=utf8", $db["user"], $db["pass"]);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     return $pdo;
 };
+$container["logger"] = function($c) {
+    $log = $c["settings"]["logger"];
+    $logger = new \Monolog\Logger($log["name"]);
+    $file_handler = new \Monolog\Handler\StreamHandler($log["file"]);
+    $logger->pushHandler($file_handler);
+    return $logger;
+};
 
-$app->get('/hello/{name}/', function (Request $request, Response $response) {
-    //debug_to_console ("hello");
-    $name = $request->getAttribute('name');
-    $narr = str_split($name);
-    for ($i = 0; $i < 10; $i++) {
-        shuffle($narr);
-        $array[] = array('id' => $i, 'hello' => implode('', $narr));
-    }
-    return $response->withJson($array);
+/*
+ * Lookups
+ */
+$app->get("/lookupdept", function (Request $request, Response $response) {
+    $sql = "SELECT id as value, name as label FROM department WHERE name LIKE :term;";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute(["term" => "%" . $request->getParam("term") . "%"]);
+    return $response->withJson($stmt->fetchAll(\PDO::FETCH_OBJ));
 });
 
-$app->get('/echo/{name}/', function (Request $request, Response $response) {
-    $name = $request->getAttribute('name');
-    $narr = str_split($name);
-    for ($i = 0; $i < 20; $i++) {
-        shuffle($narr);
-        $array[] = array('id' => $i, 'echo' => implode('', $narr));
-    }
-    return $response->withJson($array);
+$app->get("/lookupempl", function (Request $request, Response $response) {
+    $sql = "SELECT id as value, concat(first, ' ', last) as label FROM employee WHERE "
+            . "first LIKE :term1 OR last LIKE :term2;";
+    $stmt = $this->db->prepare($sql);
+    $term = "%" . $request->getParam("term") . "%";
+    $stmt->execute(["term1" => $term, "term2" => $term]);
+    return $response->withJson($stmt->fetchAll(\PDO::FETCH_OBJ));
 });
 
-$app->post('/ticket/new', function (Request $request, Response $response) {
-    $data = $request->getParsedBody();
-    $ticket_data = [];
-    $ticket_data['title'] = filter_var($data['title'], FILTER_SANITIZE_STRING);
-    $ticket_data['description'] = filter_var($data['description'], FILTER_SANITIZE_STRING);
-    // ...
-    return $response;
+/*
+ * Department
+ */
+$app->any("/department[/{id}]", function (Request $request, Response $response) {
+    $mapper = new DepartmentMapper($request);
+    $sql = $mapper->getSql();
+    $params = $mapper->getQueryParams();
+    $body = $request->getParsedBody();
+
+//    foreach ($body as $k => $v) {
+//        $this->logger->info($k . ' => ' . $v);
+//        $this->logger->info($k . ' => ' . $params[$k]);
+//    }
+
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
+
+    $result = $mapper->getResult($this->db, $stmt);
+    return $response->withJson($result);
 });
 
+/*
+ * Employee
+ */
+$app->any("/employee[/{id}]", function (Request $request, Response $response) {
+    $mapper = new EmployeeMapper($request);
+    $sql = $mapper->getSql();
+    $params = $mapper->getQueryParams();
 
-// It is possible to get all the query parameters from a request by doing $request->getQueryParams() 
-// which will return an associative array. So for the URL /tickets?sort=date&order=desc we�d get an associative array like:
-// ["sort" => "date", "order" => "desc"]
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
 
-
-$app->any('/department[/{id}]', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $id = $request->getAttribute('id');
-    if ($request->isGet()) {
-        if (is_null($id)) {
-            $depts = $mapper->getDepts();
-        } else {
-            $depts = $mapper->getDeptById($id);
-        }
-    }
-    if ($request->isPut() || $request->isPost()) {
-        $depts = $mapper->saveDept($request->getParsedBody());
-    }
-    if ($request->isDelete()) {
-        $depts = $mapper->delDept($id);
-    }
-    return $response->withJson($depts);
+    $result = $mapper->getResult($this->db, $stmt);
+    return $response->withJson($result);
 });
 
-$app->any('/employee[/{id}]', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $id = $request->getAttribute('id');
-    if ($request->isGet()) {
-        if (is_null($id)) {
-            $empls = $mapper->getEmpls();
-        } else {
-            $empls = $mapper->getEmplById($id);
-        }
-    }
-    if ($request->isPut() || $request->isPost()) {
-        $empls = $mapper->saveEmpl($request->getParsedBody());
-    }
-    if ($request->isDelete()) {
-        $empls = $mapper->delEmpl($id);
-    }
-    return $response->withJson($empls);
+/*
+ * Employee on hire
+ */
+$app->get("/hire[/{dept}]", function (Request $request, Response $response) {
+    $sql = "SELECT * FROM employee WHERE employee.hire = :dept";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute(["dept" => $request->getAttribute("dept")]);
+    return $response->withJson($stmt->fetchAll(\PDO::FETCH_OBJ));
 });
 
-$app->get('/department/{did}/hire[/{eid}]', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $did = $request->getAttribute('did');
-    $eid = $request->getAttribute('eid');
-    if (is_null($eid)) {
-        $empls = $mapper->getEmplByHire($did);
-    } else {
-        $empls = $mapper->getEmplById($eid);
-    }
-    return $response->withJson($empls);
+/*
+ * Employee on loan
+ */
+$app->get("/loan[/{dept}]", function (Request $request, Response $response) {
+    $sql = "SELECT * FROM employee WHERE employee.loan = :dept";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute(["dept" => $request->getAttribute("dept")]);
+    return $response->withJson($stmt->fetchAll(\PDO::FETCH_OBJ));
 });
 
-$app->get('/hire[/{id}]', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $id = $request->getAttribute('id');
-    $empls = $mapper->getEmplByHire($id);
-    return $response->withJson($empls);
-});
-
-$app->get('/loan[/{id}]', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $id = $request->getAttribute('id');
-    $empls = $mapper->getEmplByLoan($id);
-    return $response->withJson($empls);
-});
-
-$app->get('/autoempl', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $term = $request->getParam('term');
-    $values = $mapper->getAutoEmpl($term);
-    return $response->withJson($values);
-});
-
-$app->get('/autodept', function (Request $request, Response $response) {
-    $mapper = new DBInterface($this->db);
-    $term = $request->getParam('term');
-    $values = $mapper->getAutoDept($term);
-    return $response->withJson($values);
-});    
-
+/*
+ * Run !
+ */
 $app->run();
 

@@ -1,106 +1,72 @@
-/* global Item, Department, Employee */
+/* global Item, Department, Employee, fields, pages */
 
-// https://github.com/jpillora/jquery.rest
 
+// get("/lookupdept", function (Request $request, Response $response) {
+// get("/lookupempl", function (Request $request, Response $response) {
+// any("/department[/{id}]", function (Request $request, Response $response) {
+// any("/employee[/{id}]", function (Request $request, Response $response) {
+// get("/hire[/{dept}]", function (Request $request, Response $response) {
+// get("/loan[/{dept}]", function (Request $request, Response $response) {
+
+
+
+//console.log(fields.department);
+//console.log(fields.employee);
 /*
- I see this very simply. I think PUT got droped by the road side some time ago by mistake when the web went asynchronous. POST appeared to be more understandable to devs GET and POST - simple (although wrongly interpreted - which having read the specs is anyone really surprised?). Didn't some browsers in early days not even support PUT as well?
- 
- SO....my personal approach. I make this decision to make life for devs using Apis I create...easier.
- 
- I use POST for create and update. If it has an Id - update, else create. From a dev point of view its one point to do this work. I think its cleaner.
- 
- ========
- 
- Let me offer an alternative simplification.
- 
- GET <resource_uri> <== Simply gets you the contents of the resources or list 
- PUT <resource_uri> <data> <== Replace the contents of a fully qualified resource uri [Implies the the resource item must exist before you can PUT
- POST <resource_uri> <action> [<data>] <= perform a action on a resource or a list of resources at the resource uri. if the action is omitted it creates the resource item with the data sent in the request. 
- DELETE <resoutce_uri> and PATCH <resource_uri> stands for the meaning of the respective verb. PATCH is a whole another discussion : Reference: http://tools.ietf.org/html/...
- 
- Note that all other requests do not have an action while POST has an action to be performed on the resource with the default action being CREATE or ADD
- 
- Hope this eases some confusions.
- 
- To make it as convention in your design it might be worth while to use POST even when the action feels like it is a GET opertion (some thing like "get_status") . Since you are performing an action consider it is a POST
- 
- */
-let REFRESH_TIMEOUT = 100;
-let NO_IDENTIFIER = -1;
+let dept = {id:5, name: 'ICT', headdept: 1, manager:null};
+let empl = {id:13, first:'Paul', last:'Smith', hire:5, loan:null};
 
-let restClient = new $.RestClient('http://company.localhost/api.php/', {stripTrailingSlash: true, stringifyData: true});
+console.log('>>item dept, no value');
+let dept0 = new Item2(fields.department);
+console.log('>>item dept, value');
+let dept1 = new Item2(fields.department,dept);
+console.log('>>item empl, no value');
+let empl0 = new Item2(fields.employee);
+console.log('>>item empl, value');
+let empl1 = new Item2(fields.employee,empl);
+
+console.log(dept0, dept1);
+console.log(empl0, empl1);
+console.log(dept1._fields.id.htmlInput,dept1._fields.name.htmlInput);
+*/
+
+let rest = new Api('http://company.localhost/api.php/');
+rest.addEndpoint('lookupdept');
+rest.addEndpoint('lookupempl');
+    
 let pgStack = init();
+console.log('>>> Fields: ', fields);
+console.log('>>> Pages: ', pages);
+console.log('>>> PageStack: ', pgStack);
 
-function checkAutocomplete(input, apiClass) {
-    if ($(input).hasClass(apiClass)) {
-		$(input).autocomplete({ 
-			delay: 100,
-			minLength: 1,
-			source: function(request, response) {
-				restClient[apiClass].read({term:request.term}).done(response);
-			}
-		});
-	}
-}
+
 /*******************************************************************/
 function init() {
-
-    let ps = new PageStack();
-    // main page
-    let mn = new Page('main', {next: 'main', itemClass: Item});
-    // add items to main page (manually)
-    mn.addItem('Departments', 'deptlst');
-    mn.addItem('Employees', 'emplst');
-    mn.addItem('Department/Employees on hire', 'depthire');
-    mn.addItem('Department/Employees on loan', 'deptloan');
-    ps.addPage(mn);
-
-    // add pages which will use REST
-    restClient.add('department');
-    ps.addPage(new Page('deptlst', {next: 'deptlst', api: restClient.department, itemClass: Department, detail: restClient.department, mode: 'CUD'}));
-
-    restClient.add('employee');
-    ps.addPage(new Page('emplst', {next: 'emplst', api: restClient.employee, itemClass: Employee, detail: restClient.employee, mode: 'CUD'}));
-
-    restClient.add('hire');
-    restClient.department.add('hire');
-    ps.addPage(new Page('depthire', {next: 'emphire', api: restClient.department, itemClass: Department}));
-    ps.addPage(new Page('emphire', {next: 'emphire', api: restClient.hire, itemClass: Employee, detail: restClient.employee, mode: 'CUD'}));
-
-    restClient.add('loan');
-    ps.addPage(new Page('deptloan', {next: 'emploan', api: restClient.department, itemClass: Department}));
-    ps.addPage(new Page('emploan', {next: 'emploan', api: restClient.loan, itemClass: Employee, detail: restClient.employee, mode: 'CUD'}));
-
-    restClient.add('autoempl');
-    restClient.add('autodept');
-    // debug
-    console.log(ps);
-
-    return ps;
+	let ps = new PageStack();
+	for (let page in pages) {
+		ps.addPage(page, pages[page]);
+	}
+	return ps;
 }
 
 $(document).ready(function () {
 
     // listeners
     $('#back-btn').on('vclick', '', function () {
-        console.log('click: back bttn');
         pgStack.back();
     });
     $('#add-btn').on('vclick', '', function () {
-        console.log('click: add bttn, for ' + pgStack.next);
         pgStack.addItem();
     });
     $('#save-btn').on('vclick', '', function () {
-        let fields = $('#list-entities li input');
-        let data = [];
-        console.log('click: save bttn');
-        $.each(fields, function (k, v) {
-            data.push({label: $(v).prop('id'), value: $(v).val()});
-        });
-        pgStack.updItem(data);
+//        let fields = $('#list-entities li input');
+//        let data = [];
+//        $.each(fields, function (k, v) {
+//            data.push({label: $(v).prop('id'), value: $(v).val()});
+//        });
+        pgStack.updItem();
     });
     $('#del-btn').on('vclick', '', function () {
-        console.log('click: delete bttn');
         pgStack.delItem();
     });
 
@@ -108,7 +74,7 @@ $(document).ready(function () {
         let target = $(this).data('target');
         let identity = $(this).data('identity');
         console.log('click: ' + $(this).parents('ul').attr('id') + ', target: ' + target + ', id:' + identity);
-        pgStack.forward(target, identity);
+        pgStack.next(target, identity);
     });
     $('#list-entities').on('vclick', 'li', function (e) {
         //console.log('click divider: ' + $(this).text());
@@ -116,21 +82,23 @@ $(document).ready(function () {
     $('#list-entities').on('focus', 'input', function (e) {
         //checkAutocomplete(this, 'autoempl');
         //checkAutocomplete(this, 'autodept');
-		if ($(this).hasClass('autoempl')) {
+		//if ($(this).hasClass('lookupempl')) {
+		if ($(this).attr('lookup') === 'lookupempl') {
 			$(this).autocomplete({ 
 				delay: 100,
 				minLength: 1,
 				source: function(request, response) {
-					restClient.autoempl.read({term:request.term}).done(response);
+					rest.lookupempl.get({term:request.term}).done(response);
 				}
 			});
 		}
-        if ($(this).hasClass('autodept')) {
+        //if ($(this).hasClass('lookupdept')) {
+        if ($(this).attr('lookup') === 'lookupdept') {
 			$(this).autocomplete({ 
 				delay: 100,
 				minLength: 1,
 				source: function(request, response) {
-					restClient.autodept.read({term:request.term}).done(response);
+					rest.lookupdept.get({term:request.term}).done(response);
 				}
 			});
 		}
@@ -138,7 +106,8 @@ $(document).ready(function () {
 
 
     // show the 1st page
-    pgStack.forward('main');
+    //pgStack.forward('main');
+	pgStack.next('menu');
 
 });
 /*******************************************************************/

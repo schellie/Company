@@ -12,3 +12,9 @@
 .ui-menu-item:hover {
     cursor: pointer;
 }
+
+/* slider */
+.ui-slider-track {
+    left: 60px;
+    width: inherit;
+}
