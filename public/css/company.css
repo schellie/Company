@@ -1,5 +1,6 @@
 /* autocomplete box */
 .ui-menu .ui-menu-item {
+    position: relative; 
     background: #fff;
 	border: 1px solid #ddd;
 	border-radius: .3125em;
@@ -8,6 +9,7 @@
     list-style-type: none;
     margin: 0;
     padding: 3px;
+    z-index:100;
 }
 .ui-menu-item:hover {
     cursor: pointer;
@@ -17,4 +19,12 @@
 .ui-slider-track {
     left: 60px;
     width: inherit;
+}
+
+/* inline icon (for dividers) */
+.inlineIcon {
+    display: inline-block;
+    position: relative;
+    vertical-align: middle;
+    margin-right: 6px;
 }

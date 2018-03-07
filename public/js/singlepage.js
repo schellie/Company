@@ -1,4 +1,4 @@
-/* global rest */
+/* global rest, pages */
 
 /**
  * Global variables
@@ -6,7 +6,6 @@
 let REFRESH_TIMEOUT = 100;
 let NO_IDENTIFIER = -1;
 let SELF_CLOSERS = ['input', 'img', 'hr', 'br', 'meta', 'link'];
-
 /**
  * Helper functions
  */
@@ -74,7 +73,7 @@ class Api {
     get() { // id is optional, check arguments
         let url = this.apibase;
         if (arguments.length > 0) {
-            if (typeof arguments[0] === 'number') {
+            if (typeof arguments[0] !== 'object') {
                 url += '/' + arguments[0];
             } else {
                 url += '?term=' + arguments[0].term;
@@ -145,7 +144,6 @@ class Field {
         this._attr['id'] = this._id;
         this._attr['value'] = this._val;
         this._attr['data-mini'] = 'true';
-
         switch (this._input) {
             case 'text':
                 if ('lookup' in this._attr) // lookup defined
@@ -178,7 +176,6 @@ class Field {
             default:
         }
         return html + '</li>';
-
     }
     makeInput(id, label, attribs) {
         let attr = '';
@@ -208,33 +205,6 @@ class Field {
         return this._val;
     }
 }
-
-
-/**
- * 
- * 			<div class="ui-field-contain">
- <label for="title">Title of recording</label>
- <input type="text" name id="title" data-mini="true">
- </div>
- <div class="ui-field-contain">
- <label for="comment">Comments</label>
- <input type="text" name id="comment" data-mini="true">
- </div>
- <div class="ui-field-contain">
- <label for="year">Year</label>
- <input id="year" value="2016" min="1900" max="2100" type="range" step="1">
- </div>
- <div class="ui-field-contain">
- <label for="storage">Storage</label>
- <select id="storage" data-mini="true">
- </select>
- </div>
- <div class="ui-field-contain">
- <label for="performer">Performer:</label>
- <input type="text" name id="performer" data-mini="true" disabled=true>
- </div>
- 
- */
 
 /**
  * Item class
@@ -303,6 +273,7 @@ class Item {
  *     - string specifying api endnode
  *     - array of entries (title, target)
  *   type: pagetype, can be 'list' or 'detail'
+ *   divider: indicates whether the list uses dividers, and what the initial state is
  *   target: default target (next page) for all items
  *   fields: points to table/view def. in 'fields'
  *   mode: 
@@ -316,6 +287,8 @@ class Page {
     // _fields: array of 'field' object definitions
     // _item: Item (only for detail page - used to read values)
     // _type: string
+    // _divider: boolean
+    //      _dividercollapsed: boolean
     // _target: string
     // _create: boolean
     // _update: boolean
@@ -338,6 +311,7 @@ class Page {
             this._source = rest[page.source];
         }
         this._fields = page.fields;
+        this._filter = page.filter || false;
         this._type = page.type;
         if (this._type !== 'list' && this._type !== 'detail')
             console.log('Invalid type for page!');
@@ -352,12 +326,59 @@ class Page {
                 this._delete = (page.mode.toUpperCase().indexOf('D') !== -1);
             }
         }
+        this._divider = (page.divider === 'collapsed' || page.divider === 'expanded') || false;
+        if (this._divider)
+            this._dividercollapsed = (page.divider === 'collapsed');
     }
     get target() {
         return this._target;
     }
     setTop() {
         this._top = true;
+    }
+    createDivider() {
+        if (!this._divider)
+            return;
+        let icon = '<span class="ui-btn-icon-notext inlineIcon"></span>';
+        let btngrp = '<li><div class="ui-grid-a ui-mini">'
+            + '<div class="ui-block-a"><span id="btnE" class="ui-btn ui-corner-all collapseExpand">Expand All</span></div>'
+            + '<div class="ui-block-b"><span id="btnC" class="ui-btn ui-corner-all collapseExpand">Collapse All</span></div>'
+            + '</div></li>';
+        $('.ui-li-divider').prepend(icon);
+        if (this._dividercollapsed) {
+            $('.ui-li-divider .inlineIcon').addClass('ui-icon-plus');
+            let li = $('.ui-li-divider').next(':not(.ui-li-divider)');
+            while (li.length > 0) {
+                li.hide();
+                li = li.next(':not(.ui-li-divider)');
+            }
+        } else
+            $('.ui-li-divider .inlineIcon').addClass('ui-icon-minus');
+        // add button group
+        $('#list-entities').prepend(btngrp);
+        // add handlers
+        $('.collapseExpand').on('vclick', function () {
+            var collapseAll = this.id === "btnC";
+            if (collapseAll) {
+                $(".ui-li-divider .ui-icon-minus").click();
+            } else {
+                $(".ui-li-divider .ui-icon-plus").click();
+            }
+        });
+    }
+    toggleDivider(divider) {
+        let li = $(divider).next(':not(.ui-li-divider)');
+        let collapsed = li.css('display') === 'none';
+        while (li.length > 0) {
+            li.slideToggle(300);
+            li = li.next(':not(.ui-li-divider)');
+        }
+        let icon = $(divider).find('.inlineIcon');
+        if (!collapsed) {
+            icon.removeClass('ui-icon-minus').addClass('ui-icon-plus');
+        } else {
+            icon.removeClass('ui-icon-plus').addClass('ui-icon-minus');
+        }
     }
     paint() {
         if (this._create && this._type === 'list') {
@@ -394,7 +415,15 @@ class Page {
                 html += new Item(this._fields, data[item]).listString;
             }
         }
-        $('#list-entities').html(html).listview('refresh').trigger('create');
+        // create entries (& dividers)
+        $('#list-entities').html(html).listview({
+            autodividers: this._divider ? true : false
+        }).listview('refresh').trigger('create');
+        if (this._filter)
+            $('form.ui-filterable').show();
+        else
+            $('form.ui-filterable').hide();
+        this.createDivider();
     }
     getREST(id) { // get the data (from ajax call, or locally)
         // GET /url
@@ -450,13 +479,50 @@ class Page {
  * 
  * _stack: names & ids of pages (index in _pages):  {_page, _id}
  * _pages: map of valid pages, links to Page objects
+ * _lookups: links to lookups (API get)
  */
 class PageStack {
     // _stack: array of {_page, _id}
     // _pages: array of Page objects
+    // _lookups: array of Api objects
     constructor() {
+        let that = this;
         this._stack = [];
         this._pages = [];
+        this._lookups = [];
+        for (let page in pages) {
+            this.addPage(page, pages[page]);
+            this.checkForLookup(pages[page].fields);
+        }
+
+        // setup listeners
+        $('#back-btn').on('vclick', '', function () {
+            that.back();
+        });
+        $('#add-btn').on('vclick', '', function () {
+            that.addItem();
+        });
+        $('#save-btn').on('vclick', '', function () {
+            that.updItem();
+        });
+        $('#del-btn').on('vclick', '', function () {
+            that.delItem();
+        });
+        $('#list-entities').on('vclick', 'a', function (e) {
+            let target = $(this).data('target');
+            let identity = $(this).data('identity');
+            console.log('click: ' + $(this).parents('ul').attr('id') + ', target: ' + target + ', id:' + identity);
+            that.next(target, identity);
+            e.stopPropagation();
+        });
+        $('#list-entities').on('focus', 'input', function (e) {
+            that.checkLookup(this);
+            e.stopPropagation();
+        });
+        $('#list-entities').on('vclick', 'li', function (e) {
+            that._pages[that.currentPage].toggleDivider(this);
+            e.stopPropagation();
+        });
     }
     get currentPage() {
         return this._stack[this._stack.length - 1]._page;
@@ -484,6 +550,32 @@ class PageStack {
     addPage(name, page) { // add a valid page (only those will be on the stack)
         this._pages[name] = new Page(page);
     }
+    checkForLookup(fields) {
+        for (let field in fields) {
+            if (field === 'listString')
+                continue;
+            if ('attribs' in fields[field] && 'lookup' in fields[field].attribs)
+                this.addLookup(fields[field].attribs['lookup']);
+        }
+    }
+    addLookup(lookup) {
+        if (typeof this._lookups[lookup] !== 'object') { // create rest entity
+            rest.addEndpoint(lookup);
+        }
+        this._lookups[lookup] = rest[lookup];
+    }
+    checkLookup(input) {
+        let lookup = $(input).attr('lookup');
+        if (lookup in this._lookups) {
+            $(input).autocomplete({
+                delay: 100,
+                minLength: 1,
+                source: function (request, response) {
+                    rest[lookup].get({term: request.term}).done(response);
+                }
+            });
+        }
+    }
     showPage() {
         this._pages[this.currentPage].getREST(this.currentId);
     }
@@ -504,4 +596,3 @@ class PageStack {
         }
     }
 }
-

@@ -53,6 +53,13 @@ $app->get("/lookupdept", function (Request $request, Response $response) {
     return $response->withJson($stmt->fetchAll(\PDO::FETCH_OBJ));
 });
 
+$app->get("/lookupcounty", function (Request $request, Response $response) {
+    $sql = "SELECT id as value, name as label FROM country WHERE name LIKE :term;";
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute(["term" => "%" . $request->getParam("term") . "%"]);
+    return $response->withJson($stmt->fetchAll(\PDO::FETCH_OBJ));
+});
+
 $app->get("/lookupempl", function (Request $request, Response $response) {
     $sql = "SELECT id as value, concat(first, ' ', last) as label FROM employee WHERE "
             . "first LIKE :term1 OR last LIKE :term2;";
@@ -88,6 +95,21 @@ $app->any("/department[/{id}]", function (Request $request, Response $response) 
  */
 $app->any("/employee[/{id}]", function (Request $request, Response $response) {
     $mapper = new EmployeeMapper($request);
+    $sql = $mapper->getSql();
+    $params = $mapper->getQueryParams();
+
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
+
+    $result = $mapper->getResult($this->db, $stmt);
+    return $response->withJson($result);
+});
+
+/*
+ * Country
+ */
+$app->any("/country[/{id}]", function (Request $request, Response $response) {
+    $mapper = new CountryMapper($request);
     $sql = $mapper->getSql();
     $params = $mapper->getQueryParams();
 
