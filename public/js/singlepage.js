@@ -17,7 +17,8 @@ let DELBUTTON = '#del-btn';
 let COLPSGROUP = '#collapse-group';
 let COLPSBUTTON = '#colps-btn';
 let EXPNDBUTTON = '#expnd-btn';
-let LISTCONTAINER = '#list-entities:not(.ui-input-clear)'; // not the search fields
+let LISTCONTAINER = '#list-entities';
+let LISTCONTAINERN = '#list-entities:not(.ui-input-clear)';
 let LISTDIVIDER = '.ui-li-divider';
 let NOTLISTDIVIDER = ':not(.ui-li-divider)';
 
@@ -555,18 +556,17 @@ class PageStack {
         $(EXPNDBUTTON).on('vclick', '', function () { // click expand-button
             $('.ui-li-divider .ui-icon-plus').click();
         });
-        $(LISTCONTAINER).on('vclick', 'a', function (e) { // click in the list
+        $(LISTCONTAINER).on('vclick', 'a:not(.ui-input-clear)', function (e) { // click in the list
             let target = $(this).data('target');
             let identity = $(this).data('identity');
-//            console.log('click: ' + $(this).parents('ul').attr('id') + ', target: ' + target + ', id:' + identity);
             that.next(target, identity);
             e.stopPropagation();
         });
-        $(LISTCONTAINER).on('focus', 'input', function (e) { // enter an input field (& lookup...)
+        $(LISTCONTAINER).on('input', 'input[lookup]:not(.ui-input-clear)', function (e) {
             that.checkLookup(this);
             e.stopPropagation();
         });
-        $(LISTCONTAINER).on('vclick', 'li', function (e) { // click on a divider
+        $(LISTCONTAINER).on('vclick', LISTDIVIDER, function (e) { // click on a divider
             that._pages[that.currentPage].toggleDivider(this);
             e.stopPropagation();
         });
@@ -637,11 +637,12 @@ class PageStack {
     checkLookup(input) {
         let lookup = $(input).attr('lookup');
         if (lookup in this._lookups) {
+            let that = this;
             $(input).autocomplete({
                 delay: 100,
                 minLength: 1,
                 source: function (request, response) {
-                    this._rest[lookup].get({term: request.term}).done(response);
+                    that._rest[lookup].get({term: request.term}).done(response);
                 }
             });
         }
