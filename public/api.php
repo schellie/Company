@@ -77,8 +77,7 @@ $app->any("/department[/{id}]", function (Request $request, Response $response) 
     $mapper = new DepartmentMapper($request);
     $sql = $mapper->getSql();
     $params = $mapper->getQueryParams();
-    $body = $request->getParsedBody();
-
+//    $body = $request->getParsedBody();
 //    foreach ($body as $k => $v) {
 //        $this->logger->info($k . ' => ' . $v);
 //        $this->logger->info($k . ' => ' . $params[$k]);

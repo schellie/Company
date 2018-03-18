@@ -1,4 +1,4 @@
-/* global fields, pages */
+/* global fields, pages, NO_IDENTIFIER */
 
 // get /lookupdept
 // get /lookupempl

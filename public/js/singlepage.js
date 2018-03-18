@@ -1,5 +1,3 @@
-/* global rest, pages */
-
 /**
  * Global variables
  */

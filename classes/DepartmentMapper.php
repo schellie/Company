@@ -8,5 +8,4 @@ class DepartmentMapper extends Mapper {
     protected $sqlDelete = "DELETE FROM department WHERE id=:id;";
 
     protected $autoincrement = false;
-
 }

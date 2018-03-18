@@ -8,5 +8,4 @@ class EmployeeMapper extends Mapper {
     protected $sqlDelete = "DELETE FROM employee WHERE id=:id;";
 
     protected $autoincrement = false;
-
 }

@@ -8,5 +8,4 @@ class CountryMapper extends Mapper {
     protected $sqlDelete = "DELETE FROM country WHERE id=:id;";
 
     protected $autoincrement = false;
-
 }

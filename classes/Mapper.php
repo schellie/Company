@@ -77,4 +77,5 @@ abstract class Mapper {
             return [0 => ["id" => $this->id]];
         }
     }
+    
 }
