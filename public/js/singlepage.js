@@ -381,17 +381,17 @@ class Page {
      * @returns {undefined}
      */
     paint() {
-        if (this._create && !this.detail) {
+        if (this._create && !this._detail) {
             $(ADDBUTTON).show();
         } else {
             $(ADDBUTTON).hide();
         }
-        if ((this._update || this._create) && this.detail) {
+        if ((this._update || this._create) && this._detail) {
             $(SAVEBUTTON).show();
         } else {
             $(SAVEBUTTON).hide();
         }
-        if (this._delete && this.detail) {
+        if (this._delete && this._detail) {
             $(DELBUTTON).show();
         } else {
             $(DELBUTTON).hide();

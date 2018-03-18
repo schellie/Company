@@ -111,7 +111,7 @@ let pages = {
         source: 'country',
         divider: 'collapsed', // collapsed, expanded
         fields: fields.country,
-        mode: 'CUD'
+        mode: ''
     }
 };
 
