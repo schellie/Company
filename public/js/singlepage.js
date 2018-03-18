@@ -4,12 +4,41 @@
  * Global variables
  */
 let REFRESH_TIMEOUT = 100;
+let DETAIL_PAGE = 'detail';
 let NO_IDENTIFIER = -1;
 let SELF_CLOSERS = ['input', 'img', 'hr', 'br', 'meta', 'link'];
+// Messages
+let DEL_MESSAGE = 'Are you sure you want to delete?';
+let LISTNOTDEFINED = 'listString not defined';
+
+// Selectors
+let BACKBUTTON = '#back-btn';
+let ADDBUTTON = '#add-btn';
+let SAVEBUTTON = '#save-btn';
+let DELBUTTON = '#del-btn';
+let COLPSGROUP = '#collapse-group';
+let COLPSBUTTON = '#colps-btn';
+let EXPNDBUTTON = '#expnd-btn';
+let LISTCONTAINER = '#list-entities:not(.ui-input-clear)'; // not the search fields
+let LISTDIVIDER = '.ui-li-divider';
+let NOTLISTDIVIDER = ':not(.ui-li-divider)';
+
 /**
  * Helper functions
  */
 
+/**
+ * 
+ * @returns {undefined}
+ */
+function error() {
+    let mssg = '';
+    for (let arg in arguments) {
+        mssg += arguments[arg];
+    }
+    console.log(mssg);
+    return;
+}
 /**
  * element
  * wrap content in a html tag of 'type', supplying attributes
@@ -31,24 +60,6 @@ function element(type, content, attribs = {}) {
         html += ' />';
     }
     return html;
-}
-
-/**
- * 
- * @param {string} input
- * @param {string} apiClass
- * @returns {undefined}
- */
-function checkAutocomplete(input, apiClass) {
-    if ($(input).hasClass(apiClass)) {
-        $(input).autocomplete({
-            delay: 100,
-            minLength: 1,
-            source: function (request, response) {
-                rest[apiClass].read({term: request.term}).done(response);
-            }
-        });
-    }
 }
 
 /**
@@ -225,7 +236,7 @@ class Item {
     // _create: boolean
     constructor(fields, obj = {}) {
         this._fields = {};
-        this._listString = 'listString not defined';
+        this._listString = LISTNOTDEFINED;
         this._target = obj._target || '';
         for (let key in fields) {
             if (key === 'listString') {
@@ -293,85 +304,71 @@ class Page {
     // _create: boolean
     // _update: boolean
     // _delete: boolean
-    constructor(page) {
+    constructor(page, source) {
         this._create = this._update = this._delete = false;
         this._top = false;
-        if (typeof page.source !== 'string') { // source is local defined entries 
-            this._source = [];
-            for (let i in page.source) {
-                //this._source.push(new Item2(fields.menu, page.source[i]));
-                this._source.push({title: page.source[i].title, _target: page.source[i].target});
-            }
-            //if (Array.isArray) console.log(Array.isArray(this._source));
-            //console.log(this._source instanceof Array);
-        } else {
-            if (typeof rest[page.source] !== 'object') { // create rest entity
-                rest.addEndpoint(page.source);
-            }
-            this._source = rest[page.source];
-        }
+        this._detail = false; // 'list'
+        this._source = source;
         this._fields = page.fields;
         this._filter = page.filter || false;
-        this._type = page.type;
-        if (this._type !== 'list' && this._type !== 'detail')
-            console.log('Invalid type for page!');
-        if (this._type === 'list') {
-            this._target = page.target;
-            if (typeof page.mode === 'string') {
-                this._create = (page.mode.toUpperCase().indexOf('C') !== -1);
-            }
-        } else { // detail
-            if (typeof page.mode === 'string') {
-                this._update = (page.mode.toUpperCase().indexOf('U') !== -1);
-                this._delete = (page.mode.toUpperCase().indexOf('D') !== -1);
-            }
+        this._target = page.target || DETAIL_PAGE;
+        if (typeof page.mode === 'string') {
+            this._create = (page.mode.toUpperCase().indexOf('C') !== -1);
+            this._update = (page.mode.toUpperCase().indexOf('U') !== -1);
+            this._delete = (page.mode.toUpperCase().indexOf('D') !== -1);
         }
         this._divider = (page.divider === 'collapsed' || page.divider === 'expanded') || false;
         if (this._divider)
-            this._dividercollapsed = (page.divider === 'collapsed');
+            this._initialcollapsed = (page.divider === 'collapsed');
     }
-    get target() {
-        return this._target;
-    }
+    /**
+     * Define this as the top-most page, called from the PageStack
+     * @returns {undefined}
+     */
     setTop() {
         this._top = true;
+        return;
     }
+    /**
+     * Create a list divider
+     * @returns {undefined}
+     */
     createDivider() {
-        if (!this._divider)
+        if (!this._divider || this._detail) {
+            $(COLPSGROUP).hide();
             return;
+        }
+        // show collapse/expand buttons
+        $(COLPSGROUP).show();
+        // create an icon and insert it into the divider
         let icon = '<span class="ui-btn-icon-notext inlineIcon"></span>';
-        let btngrp = '<li><div class="ui-grid-a ui-mini">'
-            + '<div class="ui-block-a"><span id="btnE" class="ui-btn ui-corner-all collapseExpand">Expand All</span></div>'
-            + '<div class="ui-block-b"><span id="btnC" class="ui-btn ui-corner-all collapseExpand">Collapse All</span></div>'
-            + '</div></li>';
-        $('.ui-li-divider').prepend(icon);
-        if (this._dividercollapsed) {
-            $('.ui-li-divider .inlineIcon').addClass('ui-icon-plus');
-            let li = $('.ui-li-divider').next(':not(.ui-li-divider)');
+        $(LISTDIVIDER).prepend(icon);
+        // if initially collapsed (list is expanded by default)
+        if (this._initialcollapsed) {
+            //$('.ui-li-divider .inlineIcon').addClass('ui-icon-plus');
+            $(LISTDIVIDER).find('.inlineIcon').addClass('ui-icon-plus');
+            let li = $(LISTDIVIDER).next(NOTLISTDIVIDER);
             while (li.length > 0) {
                 li.hide();
-                li = li.next(':not(.ui-li-divider)');
+                li = li.next(NOTLISTDIVIDER);
             }
         } else
-            $('.ui-li-divider .inlineIcon').addClass('ui-icon-minus');
-        // add button group
-        $('#list-entities').prepend(btngrp);
-        // add handlers
-        $('.collapseExpand').on('vclick', function () {
-            var collapseAll = this.id === "btnC";
-            if (collapseAll) {
-                $(".ui-li-divider .ui-icon-minus").click();
-            } else {
-                $(".ui-li-divider .ui-icon-plus").click();
-            }
-        });
+            $(LISTDIVIDER).find('.inlineIcon').addClass('ui-icon-minus');
+        return;
     }
+    /**
+     * Expand/Collapse clicked divider (called from listener)
+     * @param {DOM object} divider
+     * @returns {undefined}
+     */
     toggleDivider(divider) {
-        let li = $(divider).next(':not(.ui-li-divider)');
+        if (!this._divider)
+            return;
+        let li = $(divider).next(NOTLISTDIVIDER);
         let collapsed = li.css('display') === 'none';
         while (li.length > 0) {
             li.slideToggle(300);
-            li = li.next(':not(.ui-li-divider)');
+            li = li.next(NOTLISTDIVIDER);
         }
         let icon = $(divider).find('.inlineIcon');
         if (!collapsed) {
@@ -379,32 +376,45 @@ class Page {
         } else {
             icon.removeClass('ui-icon-plus').addClass('ui-icon-minus');
         }
+        return;
     }
+    /**
+     * Show buttons (back, add, save, delete) depending on state of page
+     * @returns {undefined}
+     */
     paint() {
-        if (this._create && this._type === 'list') {
-            $('#add-btn').show();
+        if (this._create && !this.detail) {
+            $(ADDBUTTON).show();
         } else {
-            $('#add-btn').hide();
+            $(ADDBUTTON).hide();
         }
-        if ((this._update || this._create) && this._type === 'detail') {
-            $('#save-btn').show();
+        if ((this._update || this._create) && this.detail) {
+            $(SAVEBUTTON).show();
         } else {
-            $('#save-btn').hide();
+            $(SAVEBUTTON).hide();
         }
-        if (this._delete && this._type === 'detail') {
-            $('#del-btn').show();
+        if (this._delete && this.detail) {
+            $(DELBUTTON).show();
         } else {
-            $('#del-btn').hide();
+            $(DELBUTTON).hide();
         }
         if (!this._top) {
-            $('#back-btn').show();
+            $(BACKBUTTON).show();
         } else {
-            $('#back-btn').hide();
+            $(BACKBUTTON).hide();
         }
+        return;
     }
-    show(data, textStatus, jqXHR) { // callback function for ajax calls
+    /**
+     * Callback function for AJAX GET request
+     * @param {JSON object} data
+     * @param {string} textStatus
+     * @param {jQuery XMLHttpRequest object} jqXHR
+     * @returns {undefined}
+     */
+    show(data, textStatus, jqXHR) {
         let html = '', item;
-        if (this._type === 'detail') { // we expect 1 item (show for update or delete), or none (when creating)
+        if (this._detail) { // we expect 1 item (show for update or delete), or none (when creating)
             item = (typeof data !== 'undefined') ? new Item(this._fields, data[0]) : new Item(this._fields);
             this._item = item; // save item for updates
             html = item.fields;
@@ -417,20 +427,28 @@ class Page {
         }
         // create entries (& dividers)
         $('#list-entities').html(html).listview({
-            autodividers: this._divider ? true : false
+            autodividers: this._divider && !this._detail
         }).listview('refresh').trigger('create');
-        if (this._filter)
+        if (this._filter && !this._detail)
             $('form.ui-filterable').show();
         else
             $('form.ui-filterable').hide();
         this.createDivider();
+        return;
     }
-    getREST(id) { // get the data (from ajax call, or locally)
+    /**
+     * Get the data from the DB (or from local array)
+     * @param {integer} id
+     * @param {boolean} detail
+     * @returns {boolean}
+     */
+    getREST(id, detail) {
         // GET /url
         // GET /url/id
         let callback = this.show.bind(this); // define the callback function
+        this._detail = detail || false;
 
-        if (this._type === 'detail') { // show details of record (existing or new)
+        if (this._detail) { // show details of record (existing or new)
             if (id === NO_IDENTIFIER) { // new record
                 this.show();
             } else {
@@ -448,7 +466,13 @@ class Page {
             }
         }
         this.paint();
+        return true;
     }
+    /**
+     * Saves item to DB (create or update)
+     * @param {integer} id
+     * @returns {boolean}
+     */
     putREST(id) {
         // POST /url, supply payload
         // POST /url/id, supply payload
@@ -466,10 +490,16 @@ class Page {
         }
         return false;
     }
+    /**
+     * Delete item <id> from DB
+     * @param {integer} id
+     * @returns {boolean}
+     */
     delREST(id) {
         // DELETE /url/id
         this._source.del(id).done();
         this.paint();
+        return true;
     }
 }
 
@@ -485,85 +515,127 @@ class PageStack {
     // _stack: array of {_page, _id}
     // _pages: array of Page objects
     // _lookups: array of Api objects
-    constructor() {
+    constructor(url, pages, fields, startpage) {
         let that = this;
         this._stack = [];
         this._pages = [];
         this._lookups = [];
+        this._rest = new Api(url);
         for (let page in pages) {
             this.addPage(page, pages[page]);
-            this.checkForLookup(pages[page].fields);
+            this.addLookup(pages[page].fields);
         }
 
+        $(COLPSGROUP).hide(); // not visible by default
+
         // setup listeners
-        $('#back-btn').on('vclick', '', function () {
-            that.back();
+        $(BACKBUTTON).on('vclick', '', function () { // click back-button
+            if (that._stack.length > 0)
+                that._stack.pop();
+            setTimeout(function () {
+                // back is always to a list page, so detail === false
+                that._pages[that.currentPage].getREST(that.currentId, false);
+            }, REFRESH_TIMEOUT);
         });
-        $('#add-btn').on('vclick', '', function () {
-            that.addItem();
+        $(ADDBUTTON).on('vclick', '', function () { // click add-button
+            that.next(DETAIL_PAGE, NO_IDENTIFIER);
         });
-        $('#save-btn').on('vclick', '', function () {
-            that.updItem();
+        $(SAVEBUTTON).on('vclick', '', function () { // click save-button
+            if (that._pages[that.currentPage].putREST(that.currentId))
+                $(BACKBUTTON).click();
         });
-        $('#del-btn').on('vclick', '', function () {
-            that.delItem();
+        $(DELBUTTON).on('vclick', '', function () { // click delete-button
+            let answer = confirm(DEL_MESSAGE);
+            if (answer) { // ok delete to delete
+                that._pages[this.currentPage].delREST(that.currentId);
+                $(BACKBUTTON).click();
+            }
         });
-        $('#list-entities').on('vclick', 'a', function (e) {
+        $(COLPSBUTTON).on('vclick', '', function () { // click collapse-button
+            $('.ui-li-divider .ui-icon-minus').click();
+        });
+        $(EXPNDBUTTON).on('vclick', '', function () { // click expand-button
+            $('.ui-li-divider .ui-icon-plus').click();
+        });
+        $(LISTCONTAINER).on('vclick', 'a', function (e) { // click in the list
             let target = $(this).data('target');
             let identity = $(this).data('identity');
-            console.log('click: ' + $(this).parents('ul').attr('id') + ', target: ' + target + ', id:' + identity);
+//            console.log('click: ' + $(this).parents('ul').attr('id') + ', target: ' + target + ', id:' + identity);
             that.next(target, identity);
             e.stopPropagation();
         });
-        $('#list-entities').on('focus', 'input', function (e) {
+        $(LISTCONTAINER).on('focus', 'input', function (e) { // enter an input field (& lookup...)
             that.checkLookup(this);
             e.stopPropagation();
         });
-        $('#list-entities').on('vclick', 'li', function (e) {
+        $(LISTCONTAINER).on('vclick', 'li', function (e) { // click on a divider
             that._pages[that.currentPage].toggleDivider(this);
             e.stopPropagation();
         });
+
+        // load the first page
+        this._pages[startpage].setTop();
+        this.next(startpage);
     }
+    /**
+     * Gets the page from the top of the stack
+     * @returns {string}
+     */
     get currentPage() {
         return this._stack[this._stack.length - 1]._page;
     }
+    /**
+     * Gets the id from the top of the stack
+     * @returns {integer}
+     */
     get currentId() {
         return this._stack[this._stack.length - 1]._id;
     }
-    next(target, id = NO_IDENTIFIER) { // load next page & show
-        if (target in this._pages) {
-            if (this._stack.length === 0)
-                this._pages[target].setTop();
-            this._stack.push({_page: target, _id: id});
-            this.showPage();
-        } else
-            console.log('PageStack Error: ' + target + ' is not a valid page');
-    }
-    back() { // go back one page & show after a while, or else we're too soon with the async data
-        if (this._stack.length > 0)
-            this._stack.pop();
-        let that = this;
-        setTimeout(function () {
-            that.showPage();
-        }, REFRESH_TIMEOUT);
-    }
+    /**
+     * Add a page object to the _pages array, create a rest endpoint if needed
+     * @param {string} name
+     * @param {object} page
+     * @returns {undefined}
+     */
     addPage(name, page) { // add a valid page (only those will be on the stack)
-        this._pages[name] = new Page(page);
+        let source = [];
+        if (typeof page.source === 'string') {
+            if (typeof this._rest[page.source] !== 'object') // not defined yet
+                this._rest.addEndpoint(page.source);
+            source = this._rest[page.source];
+        } else {
+            for (let i in page.source) {
+                source.push({title: page.source[i].title, _target: page.source[i].target});
+            }
+        }
+        this._pages[name] = new Page(page, source);
+        return;
     }
-    checkForLookup(fields) {
+    /**
+     * Add an api object to _lookups array, loop over the fields to check
+     * @param {object} fields
+     * @returns {undefined}
+     */
+    addLookup(fields) {
         for (let field in fields) {
-            if (field === 'listString')
+            if (field === 'listString') // skip this one
                 continue;
-            if ('attribs' in fields[field] && 'lookup' in fields[field].attribs)
-                this.addLookup(fields[field].attribs['lookup']);
+            if ('attribs' in fields[field] && 'lookup' in fields[field].attribs) {
+                // found an attribute that qualifies
+                let lookup = fields[field].attribs['lookup'];
+                if (typeof this._lookups[lookup] !== 'object') { // create rest entity
+                    this._rest.addEndpoint(lookup);
+                }
+                this._lookups[lookup] = this._rest[lookup];
+            }
         }
+        return;
     }
-    addLookup(lookup) {
-        if (typeof this._lookups[lookup] !== 'object') { // create rest entity
-            rest.addEndpoint(lookup);
-        }
-        this._lookups[lookup] = rest[lookup];
-    }
+    /**
+     * 
+     * @param {DOM object} input
+     * @returns {undefined}
+     */
     checkLookup(input) {
         let lookup = $(input).attr('lookup');
         if (lookup in this._lookups) {
@@ -571,28 +643,56 @@ class PageStack {
                 delay: 100,
                 minLength: 1,
                 source: function (request, response) {
-                    rest[lookup].get({term: request.term}).done(response);
+                    this._rest[lookup].get({term: request.term}).done(response);
                 }
             });
         }
+        return;
     }
-    showPage() {
-        this._pages[this.currentPage].getREST(this.currentId);
-    }
-    addItem() { // create new item
-        this.next(this._pages[this.currentPage].target);
-    }
-    updItem() { // save the item (changed or new)
-        let id = this.currentId;
-        if (this._pages[this.currentPage].putREST(this.currentId))
-            this.back();
-    }
-    delItem() { // delete current object
-        let answer = confirm("Are you sure you want to delete?");
-        if (answer) {
-            //delete
-            this._pages[this.currentPage].delREST(this.currentId);
-            this.back();
+    /**
+     * Show the next page: push data on the stack & retrieve the data
+     * @param {string} target
+     * @param {integer} id
+     * @returns {undefined}
+     */
+    next(target, id = NO_IDENTIFIER) { // load next page & show
+        let detail = false;
+        if (target === DETAIL_PAGE) {
+            target = this.currentPage;
+            detail = true;
         }
+        if (target in this._pages) {
+            this._stack.push({_page: target, _id: id});
+            this._pages[this.currentPage].getREST(this.currentId, detail);
+        } else
+            error('PageStack Error: ', target, ' is not a valid page');
+        // show stack
+//        console.log('>> Stack:');
+//        for (let i in this._stack) {
+//            console.log(this._stack[i]._page, this._stack[i]._id);
+//        }
+        return;
     }
 }
+
+// click on back: load previous page
+// 
+// list pages:
+// click on list-item: load page specified by item (read item): target & identifier
+// (if target === 'detail' then show the details for this item (identifier)
+//      options for list: filter, divider
+//      expand all: expand all dividers
+//      collapse all: collapse dividers
+// click on add: present an empty detail page for this page-type
+// 
+// detail pages:
+// click on delete: delete current item (identifier)
+// click on save: read the details from this item and:
+//      - create new item
+//      - update current
+//      options for the details (list of input-fields)
+//      - slider
+//      - select (radio-button)
+//      - lookup field (present list with possible values)
+
+

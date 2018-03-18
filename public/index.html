@@ -11,7 +11,6 @@
         <script src="js/jqueryui/jquery-ui.min.js"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquerymobile/1.4.5/jquery.mobile.min.js"></script>
         <script src="js/singlepage.js" type="text/javascript"></script>
-        <script src="js/config.js" type="text/javascript"></script>
         <script src="js/company.js" type="text/javascript"></script>
 
     </head>
@@ -27,6 +26,10 @@
                     <a href="#" id="save-btn" data-role="button" data-icon="check" data-iconpos="right">Save</a>
                 </div>
             </div><!-- /header -->
+            <div id="collapse-group" class="ui-grid-a ui-mini">
+                <div class="ui-block-a"><a id="expnd-btn" class="ui-btn ui-corner-all">Expand All</a></div>
+                <div class="ui-block-b"><a id="colps-btn" class="ui-btn ui-corner-all">Collapse All</a></div>
+            </div>
             <div data-role="content" class="ui-content">
                 <ul id="list-entities" data-role="listview" data-inset="true" data-filter="true">
                 </ul>
